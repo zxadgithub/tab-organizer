@@ -116,41 +116,62 @@ button:active {
   transform: translateY(0);
 }
 
-#closeSelectedButton,
-[data-action="close-group"],
-[data-action="close"] {
-  color: #8a2f48;
-  border-color: rgba(200, 84, 113, 0.22);
-  background: rgba(255, 247, 249, 0.86);
+.button-primary {
+  color: #ffffff;
+  border-color: rgba(65, 105, 225, 0.38);
+  background: linear-gradient(180deg, #5f86ff, #4169e1);
+  box-shadow: 0 10px 22px rgba(65, 105, 225, 0.24);
 }
 
-#closeSelectedButton:hover,
-[data-action="close-group"]:hover,
-[data-action="close"]:hover {
-  border-color: rgba(200, 84, 113, 0.34);
-  background: rgba(255, 239, 244, 0.98);
+.button-primary:hover {
+  color: #ffffff;
+  border-color: rgba(65, 105, 225, 0.48);
+  background: linear-gradient(180deg, #6a90ff, #365ed7);
 }
 
-[data-action="pin"] {
-  color: #6b4a13;
-  border-color: rgba(217, 130, 36, 0.24);
-  background: rgba(255, 250, 238, 0.9);
+.button-quiet {
+  color: #39506f;
+  border-color: rgba(56, 80, 122, 0.16);
+  background: rgba(248, 251, 255, 0.82);
 }
 
-[data-action="pin-domain"] {
+.button-pin {
   color: #24447c;
   border-color: rgba(65, 105, 225, 0.22);
   background: rgba(239, 245, 255, 0.88);
 }
 
-[data-action="pin"]:hover {
+.button-warn {
+  color: #6b4a13;
+  border-color: rgba(217, 130, 36, 0.24);
+  background: rgba(255, 250, 238, 0.9);
+}
+
+.button-danger {
+  color: #8a2f48;
+  border-color: rgba(200, 84, 113, 0.22);
+  background: rgba(255, 247, 249, 0.86);
+}
+
+.button-quiet:hover {
+  color: #24447c;
+  border-color: rgba(65, 105, 225, 0.28);
+  background: rgba(239, 245, 255, 0.9);
+}
+
+.button-pin:hover {
+  border-color: rgba(65, 105, 225, 0.36);
+  background: rgba(229, 238, 255, 0.98);
+}
+
+.button-warn:hover {
   border-color: rgba(217, 130, 36, 0.42);
   background: rgba(255, 246, 223, 0.98);
 }
 
-[data-action="pin-domain"]:hover {
-  border-color: rgba(65, 105, 225, 0.36);
-  background: rgba(229, 238, 255, 0.98);
+.button-danger:hover {
+  border-color: rgba(200, 84, 113, 0.34);
+  background: rgba(255, 239, 244, 0.98);
 }
 
 .summary-grid {

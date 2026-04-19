@@ -7,6 +7,7 @@ const DEFAULT_SETTINGS = {
   ignoreCommonTrackingParams: true,
   domainFilterMode: "all",
   domainFilterList: "",
+  organizeMode: "gentle",
   domainSplitEnabled: true,
   domainSplitThreshold: 5
 };
@@ -180,6 +181,9 @@ function normalizeInputSettings(input) {
   if (!["all", "exclude", "include"].includes(normalized.domainFilterMode)) {
     normalized.domainFilterMode = "all";
   }
+  if (!["gentle", "global"].includes(normalized.organizeMode)) {
+    normalized.organizeMode = "gentle";
+  }
 
   normalized.domainFilterList = String(normalized.domainFilterList || "");
   normalized.globalEnabled = Boolean(normalized.globalEnabled);
@@ -205,10 +209,15 @@ function scheduleTabCheck(tabId, windowId) {
 
       if (settings.dedupeEnabled) {
         const duplicateHandled = await dedupeTab(tabId, settings);
-        if (duplicateHandled) return;
+        if (duplicateHandled) {
+          if ((settings.sortEnabled || settings.domainSplitEnabled) && Number.isInteger(windowId)) {
+            scheduleWindowOrganize(windowId);
+          }
+          return;
+        }
       }
 
-      if (settings.domainSplitEnabled) {
+      if (settings.domainSplitEnabled && isGlobalOrganizeMode(settings)) {
         const routed = await routeTabToDedicatedDomainWindow(tabId, settings);
         if (routed) return;
       }
@@ -252,7 +261,7 @@ async function organizeAllWindows() {
 
   const windows = await chrome.windows.getAll({ populate: false });
   for (const chromeWindow of windows) {
-    if (settings.dedupeEnabled && !settings.confirmMergeOnDuplicate) {
+    if (settings.dedupeEnabled) {
       await dedupeWindow(chromeWindow.id, settings);
     }
     if (settings.sortEnabled || settings.domainSplitEnabled) {
@@ -273,6 +282,7 @@ async function dedupeTab(tabId, settings) {
   const tabs = await chrome.tabs.query({});
   const duplicate = tabs
     .filter((candidate) => candidate.id !== tab.id)
+    .filter((candidate) => isGlobalOrganizeMode(settings) || candidate.windowId === tab.windowId)
     .filter((candidate) => isSortableUrl(candidate.url))
     .filter((candidate) => shouldProcessUrl(candidate.url, settings))
     .filter((candidate) => normalizeUrl(candidate.url, settings) === currentKey)
@@ -286,7 +296,7 @@ async function dedupeTab(tabId, settings) {
     // auto-merge based on historical domain preferences.
     await queuePendingMerge(tab, duplicate);
     setCooldown(currentKey);
-    return false;
+    return true;
   }
 
   await activateAndMerge({
@@ -319,6 +329,11 @@ async function dedupeWindow(windowId, settings) {
     const remove = keep.id === existing.id ? tab : existing;
     seen.set(key, keep);
 
+    if (settings.confirmMergeOnDuplicate) {
+      await queuePendingMerge(remove, keep);
+      continue;
+    }
+
     if (!remove.active) {
       await chrome.tabs.remove(remove.id);
     }
@@ -335,7 +350,7 @@ async function organizeWindow(windowId, suppliedSettings) {
 
     const tabs = await chrome.tabs.query({ windowId });
     const pinnedCount = tabs.filter((tab) => tab.pinned).length;
-    const nonPinnedTabs = tabs.filter((tab) => !tab.pinned);
+    const nonPinnedTabs = tabs.filter((tab) => !tab.pinned).sort((a, b) => a.index - b.index);
 
     if (settings.sortEnabled) {
       // Keep domain groups in first-seen order (not alphabetically) to avoid
@@ -361,6 +376,9 @@ async function organizeWindow(windowId, suppliedSettings) {
           const aOrder = domainFirstSeenOrder.get(aDomain) ?? Number.MAX_SAFE_INTEGER;
           const bOrder = domainFirstSeenOrder.get(bDomain) ?? Number.MAX_SAFE_INTEGER;
           if (aOrder !== bOrder) return aOrder - bOrder;
+          // Within the same domain, keep open-time order: older tabs first,
+          // newer tabs always appended to the end of that domain group.
+          if (a.id !== b.id) return a.id - b.id;
           return a.index - b.index;
         }
 
@@ -368,17 +386,34 @@ async function organizeWindow(windowId, suppliedSettings) {
         return a.index - b.index;
       });
 
-      for (let index = 0; index < orderedTabs.length; index += 1) {
-        const tab = orderedTabs[index];
-        await chrome.tabs.move(tab.id, { windowId, index: pinnedCount + index });
-      }
+      await moveTabsMinimally(windowId, pinnedCount, nonPinnedTabs, orderedTabs);
     }
 
-    if (settings.domainSplitEnabled) {
+    if (settings.domainSplitEnabled && isGlobalOrganizeMode(settings)) {
       await splitCrowdedDomainIntoNewWindow(windowId, settings);
     }
   } finally {
     isOrganizing = false;
+  }
+}
+
+async function moveTabsMinimally(windowId, pinnedCount, currentTabs, targetTabs) {
+  const currentIds = currentTabs.map((tab) => tab.id);
+  const targetIds = targetTabs.map((tab) => tab.id);
+  if (currentIds.length !== targetIds.length) return;
+  if (currentIds.every((id, index) => id === targetIds[index])) return;
+
+  const working = [...currentIds];
+  for (let index = 0; index < targetIds.length; index += 1) {
+    const targetId = targetIds[index];
+    if (working[index] === targetId) continue;
+
+    const fromIndex = working.indexOf(targetId, index + 1);
+    if (fromIndex === -1) continue;
+
+    await chrome.tabs.move(targetId, { windowId, index: pinnedCount + index });
+    working.splice(fromIndex, 1);
+    working.splice(index, 0, targetId);
   }
 }
 
@@ -625,6 +660,10 @@ function getSortDomain(rawUrl) {
   } catch {
     return "";
   }
+}
+
+function isGlobalOrganizeMode(settings) {
+  return settings.organizeMode === "global";
 }
 
 function shouldProcessUrl(rawUrl, settings) {

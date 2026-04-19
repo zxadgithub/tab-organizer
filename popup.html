@@ -27,16 +27,16 @@
 
       <label class="row">
         <span>
-          <strong data-i18n="dedupeEnabledTitle">防重复标签页</strong>
-          <small data-i18n="dedupeEnabledDesc">发现重复页面时触发合并流程</small>
+          <strong data-i18n="dedupeEnabledTitle">相同链接合并</strong>
+          <small data-i18n="dedupeEnabledDesc">发现相同链接时触发合并流程</small>
         </span>
         <input id="dedupeEnabled" type="checkbox">
       </label>
 
       <label class="row">
         <span>
-          <strong data-i18n="confirmMergeTitle">合并前确认</strong>
-          <small data-i18n="confirmMergeDesc">重复页面先进入待确认列表</small>
+          <strong data-i18n="confirmMergeTitle">合并前确认（相同链接）</strong>
+          <small data-i18n="confirmMergeDesc">相同链接先进入待确认列表</small>
         </span>
         <input id="confirmMergeOnDuplicate" type="checkbox">
       </label>
@@ -73,6 +73,14 @@
           <option value="include" data-i18n="domainFilterInclude">仅处理以下域名</option>
         </select>
         <textarea id="domainFilterList" rows="3" placeholder="example.com, github.com"></textarea>
+      </section>
+
+      <section class="block">
+        <label for="organizeMode"><strong data-i18n="organizeModeTitle">整理模式</strong></label>
+        <select id="organizeMode">
+          <option value="gentle" data-i18n="organizeModeGentle">温和模式：仅在窗口内整理</option>
+          <option value="global" data-i18n="organizeModeGlobal">全局模式：跨窗口归并和拆窗</option>
+        </select>
       </section>
 
       <label class="row">

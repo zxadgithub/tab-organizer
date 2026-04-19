@@ -14,10 +14,10 @@
           <p class="sub" data-i18n="managerSub">按域名分组，拖拽即可调整标签顺序</p>
         </div>
         <div class="top-actions">
-          <button id="languageToggle" class="lang-toggle" type="button" title="切换语言">EN</button>
-          <button id="collapseAllButton" type="button">全部折叠</button>
-          <button id="refreshButton" type="button" data-i18n="refresh">刷新</button>
-          <button id="closeSelectedButton" type="button" data-i18n="closeSelected">关闭选中</button>
+          <button id="languageToggle" class="button-quiet lang-toggle" type="button" title="切换语言">EN</button>
+          <button id="collapseAllButton" class="button-quiet" type="button">全部折叠</button>
+          <button id="refreshButton" class="button-primary" type="button" data-i18n="refresh">刷新</button>
+          <button id="closeSelectedButton" class="button-danger" type="button" data-i18n="closeSelected">关闭选中</button>
         </div>
       </header>
 
@@ -44,10 +44,10 @@
             <p class="group-meta"></p>
           </div>
           <div class="group-actions">
-            <button type="button" data-action="pause-domain">暂停处理</button>
-            <button type="button" data-action="pin-domain">置顶域名</button>
-            <button type="button" data-action="select-group">全选</button>
-            <button type="button" data-action="close-group">关闭本组</button>
+            <button class="button-warn" type="button" data-action="pause-domain">暂停处理</button>
+            <button class="button-pin" type="button" data-action="pin-domain">置顶域名</button>
+            <button class="button-quiet" type="button" data-action="select-group">全选</button>
+            <button class="button-danger" type="button" data-action="close-group">关闭本组</button>
           </div>
         </header>
         <ul class="tab-list"></ul>
@@ -66,8 +66,8 @@
           <p class="tab-meta"></p>
         </div>
         <div class="tab-actions">
-          <button type="button" data-action="pin">置顶</button>
-          <button type="button" data-action="close">关闭</button>
+          <button class="button-pin" type="button" data-action="pin">置顶</button>
+          <button class="button-danger" type="button" data-action="close">关闭</button>
         </div>
       </li>
     </template>
