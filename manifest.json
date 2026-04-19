@@ -20,5 +20,14 @@
       "128": "icons/icon-128.png"
     },
     "default_popup": "popup.html"
+  },
+  "commands": {
+    "open-manager": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      },
+      "description": "Open Tab Organizer manager"
+    }
   }
 }

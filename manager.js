@@ -7,6 +7,7 @@ let draggingTabId = null;
 let draggingWindowId = null;
 let pinnedDomains = new Set();
 let collapsedDomains = new Set();
+let domainAliases = {};
 let pausedDomainsByDomain = {};
 let refreshTimer = null;
 let currentLanguage = "zh";
@@ -15,9 +16,11 @@ let lastFilteredTabIds = [];
 let lastSelectedTabId = null;
 let lastTabSnapshotSignature = "";
 let lastPausedSnapshotSignature = "";
+let editingDomain = null;
 
 const PINNED_DOMAINS_KEY = "managerPinnedDomains";
 const COLLAPSED_DOMAINS_KEY = "managerCollapsedDomains";
+const DOMAIN_ALIASES_KEY = "managerDomainAliases";
 const LANGUAGE_KEY = "popupLanguage";
 const TRANSLATIONS = {
   zh: {
@@ -44,6 +47,9 @@ const TRANSLATIONS = {
     pausedUntilSuffix: " · 暂停至 {time}",
     pinDomain: "置顶域名",
     unpinDomain: "取消置顶域名",
+    renameDomain: "重命名",
+    renameTitle: "编辑显示名称",
+    originalDomainSuffix: " · 原域名：{domain}",
     pauseDomain: "暂停处理",
     resumeDomain: "恢复处理",
     pausePrompt: "暂停该域名自动处理多少分钟？",
@@ -86,6 +92,9 @@ const TRANSLATIONS = {
     pausedUntilSuffix: " · Paused until {time}",
     pinDomain: "Pin Domain",
     unpinDomain: "Unpin Domain",
+    renameDomain: "Rename",
+    renameTitle: "Edit display name",
+    originalDomainSuffix: " · Original: {domain}",
     pauseDomain: "Pause Domain",
     resumeDomain: "Resume Domain",
     pausePrompt: "Pause this domain for how many minutes?",
@@ -156,6 +165,7 @@ async function init() {
 
   await loadPinnedDomains();
   await loadCollapsedDomains();
+  await loadDomainAliases();
   await refreshData();
 }
 
@@ -213,6 +223,27 @@ async function saveCollapsedDomains() {
   await chrome.storage.local.set({ [COLLAPSED_DOMAINS_KEY]: [...collapsedDomains] });
 }
 
+async function loadDomainAliases() {
+  const stored = await chrome.storage.local.get(DOMAIN_ALIASES_KEY);
+  domainAliases = normalizeDomainAliases(stored[DOMAIN_ALIASES_KEY]);
+}
+
+async function saveDomainAliases() {
+  await chrome.storage.local.set({ [DOMAIN_ALIASES_KEY]: domainAliases });
+}
+
+function normalizeDomainAliases(rawValue) {
+  if (!rawValue || typeof rawValue !== "object") return {};
+  const aliases = {};
+  for (const [domain, alias] of Object.entries(rawValue)) {
+    const cleanDomain = String(domain || "").trim().toLowerCase();
+    const cleanAlias = String(alias || "").trim();
+    if (!cleanDomain || !cleanAlias) continue;
+    aliases[cleanDomain] = cleanAlias.slice(0, 60);
+  }
+  return aliases;
+}
+
 function scheduleRefresh() {
   window.clearTimeout(refreshTimer);
   refreshTimer = window.setTimeout(refreshData, 120);
@@ -256,7 +287,8 @@ function render() {
   const keyword = searchInputEl.value.trim().toLowerCase();
   const filteredTabs = allTabs.filter((tab) => {
     if (!keyword) return true;
-    const target = `${tab.title || ""} ${tab.url || ""} ${domainOf(tab.url)}`.toLowerCase();
+    const domain = domainOf(tab.url);
+    const target = `${tab.title || ""} ${tab.url || ""} ${domain} ${getDomainDisplayName(domain)}`.toLowerCase();
     return target.includes(keyword);
   });
 
@@ -328,12 +360,16 @@ function renderGroups(groups) {
 }
 
 function buildGroupSignature(group, domainPinned, domainCollapsed, pausedUntil) {
+  const alias = getDomainAlias(group.domain);
+  const isEditing = editingDomain === group.domain;
   const tabData = group.tabs
     .map((tab) => `${tab.id}:${tab.windowId}:${tab.index}:${tab.pinned ? 1 : 0}:${tab.active ? 1 : 0}:${selectedTabIds.has(tab.id) ? 1 : 0}:${tab.title || ""}:${tab.url || ""}`)
     .join(";");
   return [
     currentLanguage,
     group.domain,
+    alias,
+    isEditing ? 1 : 0,
     domainPinned ? 1 : 0,
     domainCollapsed ? 1 : 0,
     pausedUntil || 0,
@@ -353,11 +389,25 @@ function buildGroupNode(group, ctx) {
     await toggleCollapsedDomain(group.domain);
   });
 
-  const title = ctx.domainCollapsed ? `${group.domain} (${group.tabs.length})` : group.domain;
-  node.querySelector(".group-title").textContent = title;
+  const displayName = getDomainDisplayName(group.domain);
+  const title = ctx.domainCollapsed ? `${displayName} (${group.tabs.length})` : displayName;
+  const titleEl = node.querySelector(".group-title");
+  titleEl.title = group.domain;
+  titleEl.addEventListener("click", (event) => {
+    event.stopPropagation();
+    startRenameDomain(group.domain);
+  });
+
+  if (editingDomain === group.domain) {
+    titleEl.textContent = "";
+    titleEl.append(buildDomainAliasInput(group.domain, displayName));
+  } else {
+    titleEl.textContent = title;
+  }
 
   const windowCount = new Set(group.tabs.map((tab) => tab.windowId)).size;
   let meta = t("groupMeta", { tabs: group.tabs.length, windows: windowCount });
+  if (displayName !== group.domain) meta += t("originalDomainSuffix", { domain: group.domain });
   if (ctx.domainPinned) meta += t("pinnedDomainSuffix");
   if (ctx.pausedUntil) meta += t("pausedUntilSuffix", { time: formatTime(ctx.pausedUntil) });
   node.querySelector(".group-meta").textContent = meta;
@@ -554,6 +604,14 @@ function domainOf(rawUrl) {
   }
 }
 
+function getDomainAlias(domain) {
+  return String(domainAliases[domain] || "").trim();
+}
+
+function getDomainDisplayName(domain) {
+  return getDomainAlias(domain) || domain;
+}
+
 function getPausedUntil(domain) {
   const expiresAt = Number(pausedDomainsByDomain[domain]);
   return Number.isFinite(expiresAt) && expiresAt > Date.now() ? expiresAt : null;
@@ -584,6 +642,52 @@ async function togglePinnedDomain(domain) {
   if (pinnedDomains.has(domain)) pinnedDomains.delete(domain);
   else pinnedDomains.add(domain);
   await savePinnedDomains();
+  render();
+}
+
+function buildDomainAliasInput(domain, displayName) {
+  const input = document.createElement("input");
+  input.className = "domain-alias-input";
+  input.type = "text";
+  input.value = getDomainAlias(domain) || displayName;
+  input.title = t("renameTitle");
+  input.addEventListener("click", (event) => event.stopPropagation());
+  input.addEventListener("keydown", async (event) => {
+    event.stopPropagation();
+    if (event.key === "Enter") {
+      event.preventDefault();
+      await commitDomainAlias(domain, input.value);
+    } else if (event.key === "Escape") {
+      editingDomain = null;
+      render();
+    }
+  });
+  input.addEventListener("blur", async () => {
+    if (editingDomain === domain) {
+      await commitDomainAlias(domain, input.value);
+    }
+  });
+  queueMicrotask(() => {
+    input.focus();
+    input.select();
+  });
+  return input;
+}
+
+function startRenameDomain(domain) {
+  editingDomain = domain;
+  render();
+}
+
+async function commitDomainAlias(domain, value) {
+  const alias = String(value || "").trim();
+  if (!alias || alias === domain) {
+    delete domainAliases[domain];
+  } else {
+    domainAliases[domain] = alias.slice(0, 60);
+  }
+  editingDomain = null;
+  await saveDomainAliases();
   render();
 }
 

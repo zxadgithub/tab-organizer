@@ -335,6 +335,20 @@ input[type="text"]:focus {
   font-size: 17px;
   font-weight: 800;
   letter-spacing: 0;
+  cursor: text;
+}
+
+.domain-alias-input {
+  width: min(320px, 100%);
+  min-height: 28px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 4px rgba(65, 105, 225, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  font: inherit;
+  outline: none;
 }
 
 .group-meta {

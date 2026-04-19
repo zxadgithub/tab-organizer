@@ -88,6 +88,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 
+chrome.commands.onCommand.addListener((command) => {
+  if (command === "open-manager") {
+    void openOrFocusManager();
+  }
+});
+
 async function handleMessage(message) {
   if (message?.type === "getSettings") {
     return { ok: true, settings: await getSettings() };
@@ -147,6 +153,18 @@ async function handleMessage(message) {
   }
 
   return { ok: false, error: "Unknown message type." };
+}
+
+async function openOrFocusManager() {
+  const managerUrl = chrome.runtime.getURL("manager.html");
+  const tabs = await chrome.tabs.query({});
+  const existing = tabs.find((tab) => tab.url === managerUrl);
+  if (existing?.id && Number.isInteger(existing.windowId)) {
+    await chrome.tabs.update(existing.id, { active: true });
+    await chrome.windows.update(existing.windowId, { focused: true });
+    return;
+  }
+  await chrome.tabs.create({ url: managerUrl });
 }
 
 async function getSettings() {
