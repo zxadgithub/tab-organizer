@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Popup Preview EN</title>
+    <link rel="stylesheet" href="../popup.css">
+    <style>
+      body {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+      }
+
+      main {
+        width: 374px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Tab Organizer</h1>
+        <div class="header-actions">
+          <button class="lang-toggle" type="button">中</button>
+          <button type="button">Manager</button>
+          <button id="organizeNow" type="button">Organize</button>
+        </div>
+      </header>
+
+      <label class="row">
+        <span>
+          <strong>Master Switch</strong>
+          <small>Pause all automatic dedupe, sorting, and window splitting.</small>
+        </span>
+        <input type="checkbox" checked>
+      </label>
+
+      <label class="row">
+        <span>
+          <strong>Prevent Duplicates</strong>
+          <small>Start a merge flow when a duplicate page appears.</small>
+        </span>
+        <input type="checkbox" checked>
+      </label>
+
+      <label class="row">
+        <span>
+          <strong>Sort By Domain</strong>
+          <small>Keep tabs from the same domain together.</small>
+        </span>
+        <input type="checkbox" checked>
+      </label>
+
+      <section class="block">
+        <label><strong>Domain Filter</strong></label>
+        <select>
+          <option>All domains</option>
+        </select>
+        <textarea rows="3" placeholder="example.com, github.com"></textarea>
+      </section>
+
+      <section class="block pending">
+        <strong>Pending Merges</strong>
+        <div class="pending-list">
+          <div class="pending-item">
+            <p class="pending-text">github.com: https://github.com/example/project</p>
+            <div class="pending-actions">
+              <button class="ghost" type="button">New</button>
+              <button class="ghost" type="button">Existing</button>
+              <button type="button">Merge</button>
+              <button type="button">Keep</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
