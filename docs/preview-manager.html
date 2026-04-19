@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Manager Preview</title>
+    <link rel="stylesheet" href="../manager.css">
+  </head>
+  <body>
+    <main>
+      <header class="topbar">
+        <div>
+          <h1>Tab Manager</h1>
+          <p class="sub">按域名分组，拖拽即可调整标签顺序</p>
+        </div>
+        <div class="top-actions">
+          <button type="button">刷新</button>
+          <button id="closeSelectedButton" type="button">关闭选中 (2)</button>
+        </div>
+      </header>
+
+      <section class="summary-grid">
+        <article class="stat-card"><h3>Tabs</h3><p>24</p></article>
+        <article class="stat-card"><h3>Windows</h3><p>3</p></article>
+        <article class="stat-card"><h3>Domains</h3><p>8</p></article>
+        <article class="stat-card"><h3>Selected</h3><p>2</p><small>Active: 1</small></article>
+      </section>
+
+      <section class="controls">
+        <label>筛选</label>
+        <input type="text" value="github">
+      </section>
+
+      <section class="groups">
+        <article class="group-card is-domain-pinned">
+          <header class="group-header">
+            <div class="group-left">
+              <h2 class="group-title">github.com</h2>
+              <p class="group-meta">6 tabs / 2 windows · Pinned domain</p>
+            </div>
+            <div class="group-actions">
+              <button type="button" data-action="pin-domain">取消置顶域名</button>
+              <button type="button">全选</button>
+              <button type="button" data-action="close-group">关闭本组</button>
+            </div>
+          </header>
+          <ul class="tab-list">
+            <li class="tab-row is-pinned">
+              <label class="check-wrap"><input type="checkbox" checked></label>
+              <img class="tab-favicon" src="https://github.githubassets.com/favicons/favicon.svg" alt="">
+              <div class="tab-main">
+                <p class="tab-title">Project dashboard · Pull requests</p>
+                <p class="tab-url">https://github.com/example/project/pulls</p>
+                <p class="tab-meta">Window 1 · Index 2 · Pinned · Active</p>
+              </div>
+              <div class="tab-actions">
+                <button type="button" data-action="pin">取消置顶</button>
+                <button type="button" data-action="close">关闭</button>
+              </div>
+            </li>
+            <li class="tab-row">
+              <label class="check-wrap"><input type="checkbox"></label>
+              <img class="tab-favicon" src="https://github.githubassets.com/favicons/favicon.svg" alt="">
+              <div class="tab-main">
+                <p class="tab-title">Issues · example/project</p>
+                <p class="tab-url">https://github.com/example/project/issues</p>
+                <p class="tab-meta">Window 1 · Index 5</p>
+              </div>
+              <div class="tab-actions">
+                <button type="button" data-action="pin">置顶</button>
+                <button type="button" data-action="close">关闭</button>
+              </div>
+            </li>
+          </ul>
+        </article>
+
+        <article class="group-card">
+          <header class="group-header">
+            <div class="group-left">
+              <h2 class="group-title">openai.com</h2>
+              <p class="group-meta">4 tabs / 1 window</p>
+            </div>
+            <div class="group-actions">
+              <button type="button" data-action="pin-domain">置顶域名</button>
+              <button type="button">全选</button>
+              <button type="button" data-action="close-group">关闭本组</button>
+            </div>
+          </header>
+          <ul class="tab-list">
+            <li class="tab-row">
+              <label class="check-wrap"><input type="checkbox" checked></label>
+              <img class="tab-favicon" alt="" hidden>
+              <div class="tab-main">
+                <p class="tab-title">OpenAI API Docs</p>
+                <p class="tab-url">https://platform.openai.com/docs</p>
+                <p class="tab-meta">Window 2 · Index 1</p>
+              </div>
+              <div class="tab-actions">
+                <button type="button" data-action="pin">置顶</button>
+                <button type="button" data-action="close">关闭</button>
+              </div>
+            </li>
+          </ul>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

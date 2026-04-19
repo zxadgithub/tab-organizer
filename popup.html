@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tab Organizer</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Tab Organizer</h1>
+        <div class="header-actions">
+          <button id="languageToggle" class="lang-toggle" type="button" title="切换语言">EN</button>
+          <button id="openManager" type="button" title="打开管理页" data-i18n="openManager">管理页</button>
+          <button id="organizeNow" type="button" title="立即整理" data-i18n="organizeNow">整理</button>
+        </div>
+      </header>
+
+      <label class="row">
+        <span>
+          <strong data-i18n="globalEnabledTitle">全局开关</strong>
+          <small data-i18n="globalEnabledDesc">关闭后暂停所有自动去重、排序和拆窗行为</small>
+        </span>
+        <input id="globalEnabled" type="checkbox">
+      </label>
+
+      <label class="row">
+        <span>
+          <strong data-i18n="dedupeEnabledTitle">防重复标签页</strong>
+          <small data-i18n="dedupeEnabledDesc">发现重复页面时触发合并流程</small>
+        </span>
+        <input id="dedupeEnabled" type="checkbox">
+      </label>
+
+      <label class="row">
+        <span>
+          <strong data-i18n="confirmMergeTitle">合并前确认</strong>
+          <small data-i18n="confirmMergeDesc">重复页面先进入待确认列表</small>
+        </span>
+        <input id="confirmMergeOnDuplicate" type="checkbox">
+      </label>
+
+      <label class="row">
+        <span>
+          <strong data-i18n="sortEnabledTitle">按域名排序</strong>
+          <small data-i18n="sortEnabledDesc">把相同域名的标签页排在一起</small>
+        </span>
+        <input id="sortEnabled" type="checkbox">
+      </label>
+
+      <label class="row">
+        <span>
+          <strong data-i18n="ignoreHashTitle">忽略锚点</strong>
+          <small data-i18n="ignoreHashDesc">example.com#a 与 #b 视为同页</small>
+        </span>
+        <input id="ignoreHash" type="checkbox">
+      </label>
+
+      <label class="row">
+        <span>
+          <strong data-i18n="ignoreTrackingTitle">忽略追踪参数</strong>
+          <small data-i18n="ignoreTrackingDesc">忽略 utm、gclid、fbclid 等参数</small>
+        </span>
+        <input id="ignoreCommonTrackingParams" type="checkbox">
+      </label>
+
+      <section class="block">
+        <label for="domainFilterMode"><strong data-i18n="domainFilterTitle">域名过滤模式</strong></label>
+        <select id="domainFilterMode">
+          <option value="all" data-i18n="domainFilterAll">全部域名</option>
+          <option value="exclude" data-i18n="domainFilterExclude">排除以下域名</option>
+          <option value="include" data-i18n="domainFilterInclude">仅处理以下域名</option>
+        </select>
+        <textarea id="domainFilterList" rows="3" placeholder="example.com, github.com"></textarea>
+      </section>
+
+      <label class="row">
+        <span>
+          <strong data-i18n="splitEnabledTitle">超阈值自动拆窗</strong>
+          <small data-i18n="splitEnabledDesc">单域名标签页超过阈值后拆分到新窗口</small>
+        </span>
+        <input id="domainSplitEnabled" type="checkbox">
+      </label>
+
+      <section class="block">
+        <label for="domainSplitThreshold"><strong data-i18n="splitThresholdTitle">拆窗阈值</strong></label>
+        <input id="domainSplitThreshold" type="number" min="2" step="1">
+      </section>
+
+      <section class="block pending">
+        <strong data-i18n="pendingTitle">待确认合并</strong>
+        <div id="pendingMergeList" class="pending-list"></div>
+      </section>
+
+      <p id="status" role="status"></p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

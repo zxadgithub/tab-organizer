@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Tab De-duplicator & Domain Sorter",
+  "description": "Avoid duplicate tabs and keep tabs from the same domain together.",
+  "version": "1.0.0",
+  "permissions": ["tabs", "storage", "sessions"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Tab Organizer",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    },
+    "default_popup": "popup.html"
+  }
+}

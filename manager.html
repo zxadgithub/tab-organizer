@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tab Manager</title>
+    <link rel="stylesheet" href="manager.css">
+  </head>
+  <body>
+    <main>
+      <header class="topbar">
+        <div>
+          <h1>Tab Manager</h1>
+          <p class="sub">按域名分组，拖拽即可调整标签顺序</p>
+        </div>
+        <div class="top-actions">
+          <button id="refreshButton" type="button">刷新</button>
+          <button id="closeSelectedButton" type="button">关闭选中</button>
+        </div>
+      </header>
+
+      <section class="summary-grid" id="summary"></section>
+
+      <section class="controls">
+        <label for="searchInput">筛选</label>
+        <input id="searchInput" type="text" placeholder="按域名、标题、URL 搜索">
+      </section>
+
+      <section id="groups" class="groups"></section>
+
+      <section id="undoBar" class="undo-bar hidden">
+        <span id="undoText"></span>
+        <button id="undoButton" type="button">撤销</button>
+      </section>
+    </main>
+
+    <template id="groupTemplate">
+      <article class="group-card">
+        <header class="group-header">
+          <div class="group-left">
+            <h2 class="group-title"></h2>
+            <p class="group-meta"></p>
+          </div>
+          <div class="group-actions">
+            <button type="button" data-action="pin-domain">置顶域名</button>
+            <button type="button" data-action="select-group">全选</button>
+            <button type="button" data-action="close-group">关闭本组</button>
+          </div>
+        </header>
+        <ul class="tab-list"></ul>
+      </article>
+    </template>
+
+    <template id="tabTemplate">
+      <li class="tab-row">
+        <label class="check-wrap">
+          <input type="checkbox" data-role="select-tab">
+        </label>
+        <img class="tab-favicon" alt="">
+        <div class="tab-main">
+          <p class="tab-title"></p>
+          <p class="tab-url"></p>
+          <p class="tab-meta"></p>
+        </div>
+        <div class="tab-actions">
+          <button type="button" data-action="pin">置顶</button>
+          <button type="button" data-action="close">关闭</button>
+        </div>
+      </li>
+    </template>
+
+    <script src="manager.js"></script>
+  </body>
+</html>

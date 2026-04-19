@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Popup Preview</title>
+    <link rel="stylesheet" href="../popup.css">
+    <style>
+      body {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+      }
+
+      main {
+        width: 374px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Tab Organizer</h1>
+        <div class="header-actions">
+          <button class="lang-toggle" type="button">EN</button>
+          <button type="button">管理页</button>
+          <button id="organizeNow" type="button">整理</button>
+        </div>
+      </header>
+
+      <label class="row">
+        <span>
+          <strong>全局开关</strong>
+          <small>关闭后暂停所有自动去重、排序和拆窗行为</small>
+        </span>
+        <input type="checkbox" checked>
+      </label>
+
+      <label class="row">
+        <span>
+          <strong>防重复标签页</strong>
+          <small>发现重复页面时触发合并流程</small>
+        </span>
+        <input type="checkbox" checked>
+      </label>
+
+      <label class="row">
+        <span>
+          <strong>按域名排序</strong>
+          <small>把相同域名的标签页排在一起</small>
+        </span>
+        <input type="checkbox" checked>
+      </label>
+
+      <section class="block">
+        <label><strong>域名过滤模式</strong></label>
+        <select>
+          <option>全部域名</option>
+        </select>
+        <textarea rows="3" placeholder="example.com, github.com"></textarea>
+      </section>
+
+      <section class="block pending">
+        <strong>待确认合并</strong>
+        <div class="pending-list">
+          <div class="pending-item">
+            <p class="pending-text">github.com: https://github.com/example/project</p>
+            <div class="pending-actions">
+              <button class="ghost" type="button">看新页</button>
+              <button class="ghost" type="button">看已有</button>
+              <button type="button">合并</button>
+              <button type="button">保留</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
