@@ -88,6 +88,16 @@
         <input id="domainSplitThreshold" type="number" min="2" step="1">
       </section>
 
+      <section class="block rule-order">
+        <strong data-i18n="ruleOrderTitle">执行顺序</strong>
+        <ol class="rule-order-list">
+          <li data-i18n="ruleOrderStep1">去重检测（可进入待确认）</li>
+          <li data-i18n="ruleOrderStep2">域名路由（归并到专属窗口）</li>
+          <li data-i18n="ruleOrderStep3">同窗口域名排序</li>
+          <li data-i18n="ruleOrderStep4">超阈值拆窗（按当前策略）</li>
+        </ol>
+      </section>
+
       <section class="block pending">
         <strong data-i18n="pendingTitle">待确认合并</strong>
         <div id="pendingMergeList" class="pending-list"></div>

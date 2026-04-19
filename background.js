@@ -26,6 +26,7 @@ const TRACKING_PARAMS = new Set([
 
 const PENDING_MERGES_KEY = "pendingMerges";
 const DOMAIN_MERGE_PREFS_KEY = "domainMergePrefs";
+const PAUSED_DOMAINS_KEY = "pausedDomains";
 const DEDUPE_COOLDOWN_MS = 1800;
 const TAB_CHECK_DEBOUNCE_MS = 240;
 
@@ -33,12 +34,22 @@ let isOrganizing = false;
 let pendingOrganizeByWindow = new Map();
 let pendingTabCheckByTab = new Map();
 let recentDedupeActions = new Map();
+let pausedDomainsCache = {};
+let pausedDomainsLoaded = false;
 
 chrome.runtime.onInstalled.addListener(async () => {
   const current = await chrome.storage.sync.get(DEFAULT_SETTINGS);
   await chrome.storage.sync.set({ ...DEFAULT_SETTINGS, ...current });
+  await ensurePausedDomainsCache();
   await cleanPendingMerges();
   await organizeAllWindows();
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "local") return;
+  if (!changes[PAUSED_DOMAINS_KEY]) return;
+  pausedDomainsCache = normalizePausedDomains(changes[PAUSED_DOMAINS_KEY].newValue);
+  pausedDomainsLoaded = true;
 });
 
 chrome.tabs.onCreated.addListener((tab) => {
@@ -61,6 +72,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.tabs.onActivated.addListener(async ({ windowId }) => {
   const settings = await getSettings();
   if (!settings.globalEnabled) return;
+  await ensurePausedDomainsCache();
   if (settings.sortEnabled || settings.domainSplitEnabled) {
     scheduleWindowOrganize(windowId);
   }
@@ -113,6 +125,27 @@ async function handleMessage(message) {
     return { ok: true };
   }
 
+  if (message?.type === "getPausedDomains") {
+    return { ok: true, pausedDomains: await getPausedDomains() };
+  }
+
+  if (message?.type === "pauseDomain") {
+    const domain = String(message.domain || "").trim().toLowerCase();
+    const minutes = Number.parseInt(message.minutes, 10);
+    if (!domain) return { ok: false, error: "Invalid domain." };
+    if (!Number.isFinite(minutes) || minutes < 1) return { ok: false, error: "Invalid minutes." };
+    const expiresAt = Date.now() + minutes * 60 * 1000;
+    await setDomainPausedUntil(domain, expiresAt);
+    return { ok: true, pausedDomains: await getPausedDomains() };
+  }
+
+  if (message?.type === "unpauseDomain") {
+    const domain = String(message.domain || "").trim().toLowerCase();
+    if (!domain) return { ok: false, error: "Invalid domain." };
+    await clearPausedDomain(domain);
+    return { ok: true, pausedDomains: await getPausedDomains() };
+  }
+
   return { ok: false, error: "Unknown message type." };
 }
 
@@ -150,10 +183,16 @@ function scheduleTabCheck(tabId, windowId) {
     try {
       const settings = await getSettings();
       if (!settings.globalEnabled) return;
+      await ensurePausedDomainsCache();
 
       if (settings.dedupeEnabled) {
         const duplicateHandled = await dedupeTab(tabId, settings);
         if (duplicateHandled) return;
+      }
+
+      if (settings.domainSplitEnabled) {
+        const routed = await routeTabToDedicatedDomainWindow(tabId, settings);
+        if (routed) return;
       }
 
       if ((settings.sortEnabled || settings.domainSplitEnabled) && Number.isInteger(windowId)) {
@@ -176,6 +215,7 @@ function scheduleWindowOrganize(windowId) {
   const timeoutId = setTimeout(async () => {
     pendingOrganizeByWindow.delete(windowId);
     try {
+      await ensurePausedDomainsCache();
       await organizeWindow(windowId);
     } catch (error) {
       if (!isExpectedTabError(error)) {
@@ -190,6 +230,7 @@ async function organizeAllWindows() {
   const settings = await getSettings();
   if (!settings.globalEnabled) return;
   if (!settings.sortEnabled && !settings.dedupeEnabled && !settings.domainSplitEnabled) return;
+  await ensurePausedDomainsCache();
 
   const windows = await chrome.windows.getAll({ populate: false });
   for (const chromeWindow of windows) {
@@ -223,26 +264,8 @@ async function dedupeTab(tabId, settings) {
 
   const domain = getSortDomain(tab.url);
   if (settings.confirmMergeOnDuplicate) {
-    const prefs = await getDomainMergePrefs();
-    const decision = prefs[domain];
-
-    if (decision === "merge") {
-      await activateAndMerge({
-        removeTabId: tab.id,
-        keepTabId: duplicate.id,
-        sourceWindowId: tab.windowId,
-        keepWindowId: duplicate.windowId,
-        focusWindow: false
-      });
-      setCooldown(currentKey);
-      return true;
-    }
-
-    if (decision === "keep") {
-      setCooldown(currentKey);
-      return false;
-    }
-
+    // "Confirm before merge" should always queue for manual review and never
+    // auto-merge based on historical domain preferences.
     await queuePendingMerge(tab, duplicate);
     setCooldown(currentKey);
     return false;
@@ -345,8 +368,8 @@ async function splitCrowdedDomainIntoNewWindow(windowId, settings) {
   const threshold = settings.domainSplitThreshold;
   if (threshold < 2) return;
 
-  const tabs = await chrome.tabs.query({ windowId });
-  const eligibleTabs = tabs.filter((tab) => !tab.pinned)
+  const allTabs = await chrome.tabs.query({});
+  const eligibleTabs = allTabs.filter((tab) => !tab.pinned)
     .filter((tab) => isSortableUrl(tab.url))
     .filter((tab) => shouldProcessUrl(tab.url, settings));
   if (eligibleTabs.length === 0) return;
@@ -363,9 +386,36 @@ async function splitCrowdedDomainIntoNewWindow(windowId, settings) {
     .sort((a, b) => b[1].length - a[1].length)[0];
   if (!crowded) return;
 
-  const [, domainTabs] = crowded;
-  const nonPinnedSortableCount = tabs.filter((tab) => !tab.pinned && isSortableUrl(tab.url)).length;
-  if (domainTabs.length === nonPinnedSortableCount) return;
+  const [domain, domainTabs] = crowded;
+  const sourceWindowIds = [...new Set(domainTabs.map((tab) => tab.windowId))];
+  const existingDedicatedWindowId = await findDedicatedDomainWindowId(domain, settings, null);
+
+  if (Number.isInteger(existingDedicatedWindowId)) {
+    const tabsToMove = domainTabs
+      .filter((tab) => tab.windowId !== existingDedicatedWindowId)
+      .sort((a, b) => a.index - b.index);
+    if (tabsToMove.length === 0) return;
+
+    const activeTabFromCurrentWindow = tabsToMove.find((tab) => tab.windowId === windowId && tab.active);
+    const moved = await chrome.tabs.move(tabsToMove.map((tab) => tab.id), {
+      windowId: existingDedicatedWindowId,
+      index: -1
+    });
+    const movedTabs = Array.isArray(moved) ? moved : [moved];
+    if (activeTabFromCurrentWindow) {
+      const activeMovedTab = movedTabs.find((tab) => tab.id === activeTabFromCurrentWindow.id);
+      if (activeMovedTab?.id) {
+        await chrome.tabs.update(activeMovedTab.id, { active: true });
+        await chrome.windows.update(existingDedicatedWindowId, { focused: true });
+      }
+    }
+
+    scheduleWindowOrganize(existingDedicatedWindowId);
+    for (const sourceId of sourceWindowIds) {
+      if (sourceId !== existingDedicatedWindowId) scheduleWindowOrganize(sourceId);
+    }
+    return;
+  }
 
   const [firstTab, ...restTabs] = domainTabs.sort((a, b) => a.index - b.index);
   const newWindow = await chrome.windows.create({ tabId: firstTab.id, focused: false });
@@ -376,7 +426,53 @@ async function splitCrowdedDomainIntoNewWindow(windowId, settings) {
   }
 
   scheduleWindowOrganize(newWindow.id);
-  scheduleWindowOrganize(windowId);
+  for (const sourceId of sourceWindowIds) {
+    if (sourceId !== newWindow.id) scheduleWindowOrganize(sourceId);
+  }
+}
+
+async function routeTabToDedicatedDomainWindow(tabId, settings) {
+  const tab = await safeGetTab(tabId);
+  if (!tab || tab.pinned || !isSortableUrl(tab.url)) return false;
+  if (!shouldProcessUrl(tab.url, settings)) return false;
+  const shouldFollowFocus = Boolean(tab.active);
+
+  const domain = getSortDomain(tab.url);
+  if (!domain) return false;
+
+  const targetWindowId = await findDedicatedDomainWindowId(domain, settings, tab.windowId);
+  if (!Number.isInteger(targetWindowId)) return false;
+
+  const moved = await chrome.tabs.move(tab.id, { windowId: targetWindowId, index: -1 });
+  const movedTab = Array.isArray(moved) ? moved[0] : moved;
+  if (shouldFollowFocus && movedTab?.id && Number.isInteger(targetWindowId)) {
+    await chrome.tabs.update(movedTab.id, { active: true });
+    await chrome.windows.update(targetWindowId, { focused: true });
+  }
+  scheduleWindowOrganize(targetWindowId);
+  scheduleWindowOrganize(tab.windowId);
+  return true;
+}
+
+async function findDedicatedDomainWindowId(domain, settings, excludeWindowId) {
+  const windows = await chrome.windows.getAll({ populate: true });
+  for (const chromeWindow of windows) {
+    if (!chromeWindow?.id || chromeWindow.id === excludeWindowId) continue;
+    const tabs = Array.isArray(chromeWindow.tabs) ? chromeWindow.tabs : [];
+    if (tabs.length === 0) continue;
+
+    const eligible = tabs
+      .filter((tab) => !tab.pinned)
+      .filter((tab) => isSortableUrl(tab.url))
+      .filter((tab) => shouldProcessUrl(tab.url, settings));
+    if (eligible.length < settings.domainSplitThreshold) continue;
+
+    const sameDomain = eligible.every((tab) => getSortDomain(tab.url) === domain);
+    if (!sameDomain) continue;
+
+    return chromeWindow.id;
+  }
+  return null;
 }
 
 async function queuePendingMerge(newTab, existingTab) {
@@ -515,6 +611,8 @@ function getSortDomain(rawUrl) {
 
 function shouldProcessUrl(rawUrl, settings) {
   if (!isSortableUrl(rawUrl)) return false;
+  const domain = getSortDomain(rawUrl);
+  if (isDomainPaused(domain)) return false;
 
   const mode = settings.domainFilterMode;
   const rules = parseFilterRules(settings.domainFilterList);
@@ -524,6 +622,72 @@ function shouldProcessUrl(rawUrl, settings) {
   if (mode === "exclude") return !matched;
   if (mode === "include") return matched;
   return true;
+}
+
+async function ensurePausedDomainsCache() {
+  if (pausedDomainsLoaded) {
+    await pruneExpiredPausedDomains();
+    return;
+  }
+  const stored = await chrome.storage.local.get(PAUSED_DOMAINS_KEY);
+  pausedDomainsCache = normalizePausedDomains(stored[PAUSED_DOMAINS_KEY]);
+  pausedDomainsLoaded = true;
+  await pruneExpiredPausedDomains();
+}
+
+function normalizePausedDomains(rawValue) {
+  if (!rawValue || typeof rawValue !== "object") return {};
+  const normalized = {};
+  for (const [domain, ts] of Object.entries(rawValue)) {
+    const cleanDomain = String(domain || "").trim().toLowerCase();
+    const expiresAt = Number(ts);
+    if (!cleanDomain || !Number.isFinite(expiresAt)) continue;
+    normalized[cleanDomain] = expiresAt;
+  }
+  return normalized;
+}
+
+function isDomainPaused(domain) {
+  if (!domain) return false;
+  const expiresAt = Number(pausedDomainsCache[domain]);
+  if (!Number.isFinite(expiresAt)) return false;
+  if (expiresAt > Date.now()) return true;
+
+  delete pausedDomainsCache[domain];
+  void chrome.storage.local.set({ [PAUSED_DOMAINS_KEY]: pausedDomainsCache });
+  return false;
+}
+
+async function pruneExpiredPausedDomains() {
+  let changed = false;
+  const now = Date.now();
+  for (const [domain, expiresAt] of Object.entries(pausedDomainsCache)) {
+    if (!Number.isFinite(expiresAt) || expiresAt <= now) {
+      delete pausedDomainsCache[domain];
+      changed = true;
+    }
+  }
+  if (changed) {
+    await chrome.storage.local.set({ [PAUSED_DOMAINS_KEY]: pausedDomainsCache });
+  }
+}
+
+async function getPausedDomains() {
+  await ensurePausedDomainsCache();
+  return { ...pausedDomainsCache };
+}
+
+async function setDomainPausedUntil(domain, expiresAt) {
+  await ensurePausedDomainsCache();
+  pausedDomainsCache[domain] = expiresAt;
+  await chrome.storage.local.set({ [PAUSED_DOMAINS_KEY]: pausedDomainsCache });
+}
+
+async function clearPausedDomain(domain) {
+  await ensurePausedDomainsCache();
+  if (!Object.hasOwn(pausedDomainsCache, domain)) return;
+  delete pausedDomainsCache[domain];
+  await chrome.storage.local.set({ [PAUSED_DOMAINS_KEY]: pausedDomainsCache });
 }
 
 function parseFilterRules(input) {

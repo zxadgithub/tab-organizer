@@ -52,6 +52,11 @@ const messages = {
     splitEnabledTitle: "超阈值自动拆窗",
     splitEnabledDesc: "单域名标签页超过阈值后拆分到新窗口",
     splitThresholdTitle: "拆窗阈值",
+    ruleOrderTitle: "执行顺序",
+    ruleOrderStep1: "去重检测（可进入待确认）",
+    ruleOrderStep2: "域名路由（归并到专属窗口）",
+    ruleOrderStep3: "同窗口域名排序",
+    ruleOrderStep4: "超阈值拆窗（按当前策略）",
     pendingTitle: "待确认合并",
     readSettingsFailed: "读取设置失败",
     organizing: "正在整理...",
@@ -101,6 +106,11 @@ const messages = {
     splitEnabledTitle: "Auto Split Window",
     splitEnabledDesc: "Move a domain into its own window when it exceeds the threshold.",
     splitThresholdTitle: "Split Threshold",
+    ruleOrderTitle: "Execution Order",
+    ruleOrderStep1: "Duplicate detection (or pending review)",
+    ruleOrderStep2: "Domain routing (to dedicated window)",
+    ruleOrderStep3: "Domain sorting in current window",
+    ruleOrderStep4: "Threshold-based window split",
     pendingTitle: "Pending Merges",
     readSettingsFailed: "Failed to read settings",
     organizing: "Organizing...",
@@ -207,31 +217,43 @@ function t(key) {
 
 async function onGlobalToggleChange() {
   const checked = globalToggleEl.checked;
+  globalToggleEl.indeterminate = false;
   for (const field of linkedChildBooleanFields) {
     const input = document.querySelector(`#${field}`);
     input.checked = checked;
   }
-  await persistSettings();
+  await persistSettings({ includeGlobal: true, forceGlobalEnabled: checked });
 }
 
 async function onChildToggleChange() {
   syncGlobalFromChildren();
-  await persistSettings();
+  // Child toggles should not disable the whole extension. Keep master runtime
+  // enabled while reflecting aggregate state in the UI.
+  await persistSettings({ includeGlobal: false, forceGlobalEnabled: true });
 }
 
 function syncGlobalFromChildren() {
-  const allChildrenEnabled = linkedChildBooleanFields.every((field) => {
+  const enabledCount = linkedChildBooleanFields.filter((field) => {
     const input = document.querySelector(`#${field}`);
     return Boolean(input?.checked);
-  });
-  globalToggleEl.checked = allChildrenEnabled;
+  }).length;
+  const total = linkedChildBooleanFields.length;
+  globalToggleEl.checked = enabledCount === total;
+  globalToggleEl.indeterminate = enabledCount > 0 && enabledCount < total;
 }
 
-async function persistSettings() {
+async function persistSettings(options = {}) {
+  const includeGlobal = options.includeGlobal !== false;
+  const forceGlobalEnabled = options.forceGlobalEnabled;
   const settings = {};
 
   for (const field of booleanFields) {
+    if (!includeGlobal && field === "globalEnabled") continue;
     settings[field] = document.querySelector(`#${field}`).checked;
+  }
+
+  if (typeof forceGlobalEnabled === "boolean") {
+    settings.globalEnabled = forceGlobalEnabled;
   }
 
   for (const field of valueFields) {
@@ -280,9 +302,7 @@ async function refreshPendingMerges() {
       makeFocusButton(t("viewNew"), item.newTabId),
       makeFocusButton(t("viewExisting"), item.existingTabId),
       makeActionButton(t("merge"), item.id, "merge"),
-      makeActionButton(t("keep"), item.id, "keep"),
-      makeActionButton(t("alwaysMerge"), item.id, "alwaysMerge"),
-      makeActionButton(t("alwaysKeep"), item.id, "alwaysKeep")
+      makeActionButton(t("keep"), item.id, "keep")
     );
 
     row.append(text, actions);
@@ -316,8 +336,6 @@ async function resolvePendingMerge(mergeId, action) {
 
   if (action === "merge") setStatus(t("merged"));
   else if (action === "keep") setStatus(t("kept"));
-  else if (action === "alwaysMerge") setStatus(t("alwaysMergeSaved"));
-  else if (action === "alwaysKeep") setStatus(t("alwaysKeepSaved"));
 
   await refreshPendingMerges();
 }

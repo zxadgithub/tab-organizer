@@ -10,27 +10,29 @@
     <main>
       <header class="topbar">
         <div>
-          <h1>Tab Manager</h1>
-          <p class="sub">按域名分组，拖拽即可调整标签顺序</p>
+          <h1 data-i18n="managerTitle">Tab Manager</h1>
+          <p class="sub" data-i18n="managerSub">按域名分组，拖拽即可调整标签顺序</p>
         </div>
         <div class="top-actions">
-          <button id="refreshButton" type="button">刷新</button>
-          <button id="closeSelectedButton" type="button">关闭选中</button>
+          <button id="languageToggle" class="lang-toggle" type="button" title="切换语言">EN</button>
+          <button id="collapseAllButton" type="button">全部折叠</button>
+          <button id="refreshButton" type="button" data-i18n="refresh">刷新</button>
+          <button id="closeSelectedButton" type="button" data-i18n="closeSelected">关闭选中</button>
         </div>
       </header>
 
       <section class="summary-grid" id="summary"></section>
 
       <section class="controls">
-        <label for="searchInput">筛选</label>
-        <input id="searchInput" type="text" placeholder="按域名、标题、URL 搜索">
+        <label for="searchInput" data-i18n="searchLabel">筛选</label>
+        <input id="searchInput" type="text" data-i18n-placeholder="searchPlaceholder" placeholder="按域名、标题、URL 搜索">
       </section>
 
       <section id="groups" class="groups"></section>
 
       <section id="undoBar" class="undo-bar hidden">
         <span id="undoText"></span>
-        <button id="undoButton" type="button">撤销</button>
+        <button id="undoButton" type="button" data-i18n="undo">撤销</button>
       </section>
     </main>
 
@@ -42,6 +44,7 @@
             <p class="group-meta"></p>
           </div>
           <div class="group-actions">
+            <button type="button" data-action="pause-domain">暂停处理</button>
             <button type="button" data-action="pin-domain">置顶域名</button>
             <button type="button" data-action="select-group">全选</button>
             <button type="button" data-action="close-group">关闭本组</button>
