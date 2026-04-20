@@ -585,6 +585,14 @@ function groupTabsByDomain(tabs) {
     const aPinned = pinnedDomains.has(a.domain);
     const bPinned = pinnedDomains.has(b.domain);
     if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
+    const aPreviousIndex = lastRenderedDomains.indexOf(a.domain);
+    const bPreviousIndex = lastRenderedDomains.indexOf(b.domain);
+    const aHasPreviousPosition = aPreviousIndex !== -1;
+    const bHasPreviousPosition = bPreviousIndex !== -1;
+    if (aHasPreviousPosition && bHasPreviousPosition) return aPreviousIndex - bPreviousIndex;
+    if (aHasPreviousPosition !== bHasPreviousPosition) return aHasPreviousPosition ? -1 : 1;
+
     if (a.domain === t("otherDomain")) return 1;
     if (b.domain === t("otherDomain")) return -1;
     if (a.tabs.length !== b.tabs.length) return b.tabs.length - a.tabs.length;
@@ -629,11 +637,13 @@ function formatTime(timestamp) {
 }
 
 async function focusTab(tab) {
+  await suspendAutoOrganize();
   await chrome.tabs.update(tab.id, { active: true });
   await chrome.windows.update(tab.windowId, { focused: true });
 }
 
 async function togglePinTab(tab) {
+  await suspendAutoOrganize();
   await chrome.tabs.update(tab.id, { pinned: !tab.pinned });
   await refreshData();
 }
@@ -751,6 +761,7 @@ function attachDragEvents(rowEl, tab) {
     const targetTab = allTabs.find((item) => item.id === targetTabId);
     if (!targetTab || targetTab.windowId !== draggingWindowId) return;
 
+    await suspendAutoOrganize();
     await chrome.tabs.move(draggingTabId, { windowId: targetTab.windowId, index: targetTab.index });
     await refreshData();
   });
@@ -771,6 +782,7 @@ async function closeTabs(tabIds) {
   const validIds = tabIds.filter((id) => Number.isInteger(id));
   if (!validIds.length) return;
 
+  await suspendAutoOrganize();
   await chrome.tabs.remove(validIds);
   for (const id of validIds) selectedTabIds.delete(id);
   if (validIds.includes(lastSelectedTabId)) lastSelectedTabId = null;
@@ -799,6 +811,7 @@ async function undoCloseTabs() {
 
   for (let i = 0; i < count; i += 1) {
     try {
+      await suspendAutoOrganize();
       await chrome.sessions.restore();
     } catch {
       break;
@@ -806,6 +819,10 @@ async function undoCloseTabs() {
   }
 
   await refreshData();
+}
+
+async function suspendAutoOrganize(durationMs = 3500) {
+  await sendMessage({ type: "suspendAutoOrganize", durationMs });
 }
 
 async function sendMessage(message) {

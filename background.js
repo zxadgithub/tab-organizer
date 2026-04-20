@@ -37,6 +37,7 @@ let pendingTabCheckByTab = new Map();
 let recentDedupeActions = new Map();
 let pausedDomainsCache = {};
 let pausedDomainsLoaded = false;
+let autoOrganizeSuspendedUntil = 0;
 
 chrome.runtime.onInstalled.addListener(async () => {
   const current = await chrome.storage.sync.get(DEFAULT_SETTINGS);
@@ -70,14 +71,9 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   void cleanPendingMerges();
 });
 
-chrome.tabs.onActivated.addListener(async ({ windowId }) => {
-  const settings = await getSettings();
-  if (!settings.globalEnabled) return;
-  await ensurePausedDomainsCache();
-  if (settings.sortEnabled || settings.domainSplitEnabled) {
-    scheduleWindowOrganize(windowId);
-  }
-});
+// Do not auto-organize on mere tab activation. It can cause focus jumps when
+// users close/focus tabs from Manager. Sorting still runs on create/update and
+// manual organize actions.
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   handleMessage(message)
@@ -98,6 +94,16 @@ chrome.commands.onCommand.addListener((command) => {
 async function handleMessage(message) {
   if (message?.type === "getSettings") {
     return { ok: true, settings: await getSettings() };
+  }
+
+  if (message?.type === "suspendAutoOrganize") {
+    const durationMs = Number.parseInt(message.durationMs, 10);
+    const safeDurationMs = Number.isFinite(durationMs) && durationMs > 0
+      ? Math.min(durationMs, 10000)
+      : 2500;
+    autoOrganizeSuspendedUntil = Math.max(autoOrganizeSuspendedUntil, Date.now() + safeDurationMs);
+    clearPendingAutoOrganize();
+    return { ok: true };
   }
 
   if (message?.type === "saveSettings") {
@@ -197,12 +203,14 @@ function normalizeInputSettings(input) {
 }
 
 function scheduleTabCheck(tabId, windowId) {
+  if (isAutoOrganizeSuspended()) return;
   const existing = pendingTabCheckByTab.get(tabId);
   if (existing) clearTimeout(existing);
 
   const timeoutId = setTimeout(async () => {
     pendingTabCheckByTab.delete(tabId);
     try {
+      if (isAutoOrganizeSuspended()) return;
       const settings = await getSettings();
       if (!settings.globalEnabled) return;
       await ensurePausedDomainsCache();
@@ -237,11 +245,13 @@ function scheduleTabCheck(tabId, windowId) {
 
 function scheduleWindowOrganize(windowId) {
   if (!Number.isInteger(windowId)) return;
+  if (isAutoOrganizeSuspended()) return;
 
   clearTimeout(pendingOrganizeByWindow.get(windowId));
   const timeoutId = setTimeout(async () => {
     pendingOrganizeByWindow.delete(windowId);
     try {
+      if (isAutoOrganizeSuspended()) return;
       await ensurePausedDomainsCache();
       await organizeWindow(windowId);
     } catch (error) {
@@ -251,6 +261,17 @@ function scheduleWindowOrganize(windowId) {
     }
   }, 450);
   pendingOrganizeByWindow.set(windowId, timeoutId);
+}
+
+function isAutoOrganizeSuspended() {
+  return Date.now() < autoOrganizeSuspendedUntil;
+}
+
+function clearPendingAutoOrganize() {
+  for (const timeoutId of pendingTabCheckByTab.values()) clearTimeout(timeoutId);
+  pendingTabCheckByTab.clear();
+  for (const timeoutId of pendingOrganizeByWindow.values()) clearTimeout(timeoutId);
+  pendingOrganizeByWindow.clear();
 }
 
 async function organizeAllWindows() {
@@ -421,6 +442,16 @@ async function splitCrowdedDomainIntoNewWindow(windowId, settings) {
   const threshold = settings.domainSplitThreshold;
   if (threshold < 2) return;
 
+  const currentWindowTabs = await chrome.tabs.query({ windowId });
+  const localEligibleTabs = currentWindowTabs
+    .filter((tab) => !tab.pinned)
+    .filter((tab) => isSortableUrl(tab.url))
+    .filter((tab) => shouldProcessUrl(tab.url, settings));
+  if (localEligibleTabs.length === 0) return;
+
+  const localDomains = new Set(localEligibleTabs.map((tab) => getSortDomain(tab.url)).filter(Boolean));
+  if (localDomains.size === 0) return;
+
   const allTabs = await chrome.tabs.query({});
   const eligibleTabs = allTabs.filter((tab) => !tab.pinned)
     .filter((tab) => isSortableUrl(tab.url))
@@ -435,6 +466,7 @@ async function splitCrowdedDomainIntoNewWindow(windowId, settings) {
   }
 
   const crowded = [...tabsByDomain.entries()]
+    .filter(([domain]) => localDomains.has(domain))
     .filter(([, domainTabs]) => domainTabs.length > threshold)
     .sort((a, b) => b[1].length - a[1].length)[0];
   if (!crowded) return;

@@ -21,27 +21,30 @@
 }
 
 body {
-  min-width: 374px;
-  max-width: 374px;
+  width: 326px;
+  min-width: 326px;
+  max-width: 326px;
   margin: 0;
   color: var(--ink);
+  overflow-x: hidden;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.48), rgba(242, 247, 255, 0.86)),
     url("assets/manager-bg.svg") center top / cover no-repeat;
 }
 
 main {
+  width: 100%;
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: 12px;
+  padding: 10px;
 }
 
 header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px;
+  gap: 8px;
+  padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.72);
@@ -51,14 +54,17 @@ header {
 
 .header-actions {
   display: flex;
-  gap: 6px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 5px;
   flex: 0 0 auto;
+  min-width: 0;
 }
 
 h1 {
   margin: 0;
   color: var(--ink);
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1;
   font-weight: 820;
   letter-spacing: 0;
@@ -77,10 +83,11 @@ input[type="number"] {
 }
 
 button {
-  min-height: 32px;
-  padding: 7px 11px;
+  min-height: 30px;
+  padding: 6px 10px;
   font-size: 12px;
   font-weight: 740;
+  white-space: nowrap;
   cursor: pointer;
   transition: transform .16s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease, color .18s ease;
 }
@@ -128,16 +135,26 @@ button:active {
 
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 46px;
   align-items: center;
-  gap: 14px;
-  padding: 11px 12px;
+  gap: 8px;
+  min-height: 58px;
+  padding: 11px 32px 11px 13px;
 }
 
 .row span {
   display: grid;
   gap: 4px;
   min-width: 0;
+}
+
+.row span strong,
+.row span small {
+  min-width: 0;
+}
+
+.row span small {
+  overflow-wrap: anywhere;
 }
 
 strong {
@@ -148,16 +165,19 @@ strong {
 }
 
 small {
-  max-width: 270px;
+  max-width: 100%;
   color: var(--ink-soft);
   font-size: 12px;
   line-height: 1.38;
+  word-break: break-all;
 }
 
 input[type="checkbox"] {
   position: relative;
-  width: 42px;
-  height: 24px;
+  justify-self: start;
+  flex-shrink: 0;
+  width: 40px;
+  height: 22px;
   margin: 0;
   flex: 0 0 auto;
   border: 1px solid rgba(55, 81, 126, 0.16);
@@ -172,10 +192,10 @@ input[type="checkbox"] {
 input[type="checkbox"]::after {
   content: "";
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 18px;
-  height: 18px;
+  top: 2px;
+  left: 2px;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 3px 8px rgba(41, 64, 103, 0.22);
